@@ -10,7 +10,7 @@ javac -d out src\*.java
 ```powershell
 java -cp out Main {ไฟล์ .CSV ที่ต้องการ} {priority / fcfs} {จำนวน Workers} {จำนวน Permits printer} {จำนวน Permits database} > {ชื่อไฟล์ที่ต้องการเก็บ log}
 ```
-## เพื่อรัน Files .CSV ที่ต้องการ เช่น
+### เพื่อรัน Files .CSV ที่ต้องการ เช่น
 ```powershell
 java -cp out Main workloads\jobs_db.csv priority 3 1 2 > logs\db_priority_w3.log
 ```
