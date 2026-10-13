@@ -40,12 +40,12 @@ import java.util.concurrent.Executors;
  *   6) ตรวจ size + คำนวณ SHA-256  แล้วพิมพ์เวลา / throughput
  *
  * วิธีเขียนไฟล์ (เลือกด้วย --write)
- *   parts  worker เขียน part file ของตัวเอง (test.bin.part0 ...) แล้วต่อกันตอนท้าย  (มีขั้น merge เพิ่ม)
- *   direct worker เขียนลงไฟล์จริงตรงตำแหน่ง offset ของตัวเอง ไม่ต้อง merge        (ไฟล์ถูกจองขนาดไว้ก่อน)
+ *   parts : worker เขียน part file ของตัวเอง (test.bin.part0 ...) แล้วต่อกันตอนท้าย  (มีขั้น merge เพิ่ม)
+ *   direct : worker เขียนลงไฟล์จริงตรงตำแหน่ง offset ของตัวเอง ไม่ต้อง merge (ไฟล์ถูกจองขนาดไว้ก่อน)
  *   ทั้งสองแบบ worker ใช้โค้ดเดียวกัน แค่ได้ "ไฟล์ปลายทาง + ตำแหน่งเริ่มเขียน" ต่างกัน
  *
  * วิธีรัน
- *   java -cp out client.DownloadClient <host> <port>                     แสดงรายการไฟล์ (LIST)
+ *   java -cp out client.DownloadClient <host> <port> แสดงรายการไฟล์ (LIST)
  *   java -cp out client.DownloadClient <host> <port> <filename> [options]
  *
  *   --mode traditional|nio    วิธีอ่าน/เขียนของ worker      (ค่าเริ่มต้น traditional)
@@ -59,16 +59,6 @@ import java.util.concurrent.Executors;
  *
  * ใช้เป็นไลบรารีได้ด้วย: BenchmarkRunner เรียก download(Config) ตรง ๆ แล้วได้ Result กลับไปบันทึก
  *
- * สัญญาที่ไฟล์ถัดไปต้องมีให้ตรง
- *   RangePlanner:
- *     static List<Range> plan(long fileSize, int workers)
- *       คืนช่วงเรียงตาม index เริ่มที่ offset 0 แต่ละช่วงต่อกันพอดี และช่วงสุดท้ายจบที่ fileSize
- *   DownloadWorker (implements Callable<Long> คืนจำนวน byte ที่รับได้):
- *     enum DownloadWorker.Mode { TRADITIONAL, NIO }
- *     new DownloadWorker(String host, int port, String filename, Range range,
- *                        Path target, long targetOffset, DownloadWorker.Mode mode)
- *       ส่ง GET ขอ range ของตัวเอง แล้วเขียน byte ที่ได้ลง target เริ่มที่ targetOffset
- *       (parts: target = part file, targetOffset = 0 / direct: target = ไฟล์จริง, targetOffset = range.offset())
  */
 public final class DownloadClient 
 {
@@ -92,23 +82,23 @@ public final class DownloadClient
 
     /** ค่าตั้งของการดาวน์โหลดหนึ่งครั้ง (verifyFile เป็น null ได้ = ไม่เทียบ hash) */
     public record Config(String host, int port, String filename, DownloadWorker.Mode mode,
-                         int workers, Path outDir, WriteStrategy write, Path verifyFile) 
+                            int workers, Path outDir, WriteStrategy write, Path verifyFile)
     {
-        public Config 
+        public Config
         {
-            if (host == null || host.isBlank()) 
+            if (host == null || host.isBlank())
             {
                 throw new IllegalArgumentException("host must not be empty");
             }
-            if (port < 1 || port > 65535) 
+            if (port < 1 || port > 65535)
             {
                 throw new IllegalArgumentException("port must be 1-65535: " + port);
             }
-            if (filename == null || filename.isBlank()) 
+            if (filename == null || filename.isBlank())
             {
                 throw new IllegalArgumentException("filename must not be empty");
             }
-            if (workers < 1) 
+            if (workers < 1)
             {
                 throw new IllegalArgumentException("workers must be at least 1: " + workers);
             }
@@ -122,10 +112,10 @@ public final class DownloadClient
      *   totalSeconds    = download + merge  ใช้คำนวณ throughput (ไม่รวมเวลาคำนวณ hash)
      */
     public record Result(long fileSize, int workers, double downloadSeconds, double mergeSeconds,
-                         double totalSeconds, double mbPerSec, String sha256, String expectedSha256) 
+                            double totalSeconds, double mbPerSec, String sha256, String expectedSha256) 
     {
         /** true ถ้าไม่ได้ขอเทียบ hash หรือเทียบแล้วตรงกัน */
-        public boolean ok() 
+        public boolean ok()
         {
             return expectedSha256 == null || HashUtil.matches(expectedSha256, sha256);
         }
@@ -135,19 +125,19 @@ public final class DownloadClient
     // main
     // ============================================================
 
-    public static void main(String[] args) 
+    public static void main(String[] args)
     {
-        if (args.length < 2) 
+        if (args.length < 2)
         {
             printUsage();
             System.exit(1);
         }
-        try 
+        try
         {
             String host = args[0];
             int port = Integer.parseInt(args[1]);
 
-            if (args.length == 2) 
+            if (args.length == 2)
             {
                 printList(host, port);
                 return;
@@ -156,28 +146,28 @@ public final class DownloadClient
             Config cfg = parseConfig(host, port, args);
             Result r = download(cfg);
             printResult(cfg, r);
-            if (!r.ok()) 
+            if (!r.ok())
             {
                 System.exit(2); // hash ไม่ตรงกับต้นฉบับ
             }
-        } 
-        catch (IllegalArgumentException e) 
+        }
+        catch (IllegalArgumentException e)
         {
             System.err.println("Bad argument: " + e.getMessage());
             printUsage();
             System.exit(1);
-        } 
-        catch (ProtocolException e) 
+        }
+        catch (ProtocolException e)
         {
             System.err.println("Server replied ERROR " + e.getCode() + ": " + e.getMessage());
             System.exit(1);
-        } 
-        catch (IOException e) 
+        }
+        catch (IOException e)
         {
             System.err.println("Download failed: " + e.getMessage());
             System.exit(1);
-        } 
-        catch (InterruptedException e) 
+        }
+        catch (InterruptedException e)
         {
             Thread.currentThread().interrupt();
             System.err.println("Interrupted");
@@ -191,7 +181,7 @@ public final class DownloadClient
                 + "[--mode traditional|nio] [--workers N] [--out DIR] [--write parts|direct] [--verify FILE]]");
     }
 
-    private static Config parseConfig(String host, int port, String[] args) 
+    private static Config parseConfig(String host, int port, String[] args)
     {
         String filename = args[2];
         DownloadWorker.Mode mode = DownloadWorker.Mode.TRADITIONAL;
@@ -275,19 +265,19 @@ public final class DownloadClient
         }
 
         // 4) รัน worker พร้อมกัน แล้วรอครบ
-        long received = runWorkers(cfg, ranges, finalFile);
+        long received = runWorkers(cfg, ranges, finalFile);//รอ worker ทั้งหมดทำงานเสร็จ
         if (received != size) 
         {
             throw new IOException("received " + received + " bytes, expected " + size);
         }
-        long t1 = System.nanoTime();
+        long t1 = System.nanoTime();//เวลาที่ worker ทั้งหมดทำงานเสร็จ
 
         // 5) ต่อ part file (เฉพาะแบบ parts)
         if (cfg.write() == WriteStrategy.PARTS) 
         {
             mergeParts(ranges, cfg.filename(), cfg.outDir(), finalFile);
         }
-        long t2 = System.nanoTime();
+        long t2 = System.nanoTime();//เวลาที่ merge เสร็จ
 
         // 6) ตรวจขนาด แล้วคำนวณ hash (ไม่นับรวมในเวลา)
         long actualSize = Files.size(finalFile);
@@ -311,7 +301,7 @@ public final class DownloadClient
         try (Socket s = openSocket(host, port)) 
         {
             OutputStream out = s.getOutputStream();
-            InputStream in = s.getInputStream(); // ไม่ห่อ buffer ตามที่ Protocol.readLine ต้องการ
+            InputStream in = s.getInputStream(); 
             out.write(Protocol.infoRequest(filename).getBytes(StandardCharsets.UTF_8));
             out.flush();
             return Protocol.parseSizeResponse(Protocol.readLine(in));
@@ -422,7 +412,7 @@ public final class DownloadClient
     // ตรวจแผน / merge
     // ============================================================
 
-    /** ตรวจว่าช่วงเริ่มที่ 0 ต่อกันพอดีไม่ซ้อนไม่ขาด และจบที่ขนาดไฟล์ (จับบั๊กใน RangePlanner ได้เร็ว) */
+    /** ตรวจว่าช่วงเริ่มที่ 0 ต่อกันพอดีไม่ซ้อนไม่ขาด และจบที่ขนาดไฟล์ */
     private static void checkPlan(List<Range> ranges, long size) 
     {
         long expectedOffset = 0;
@@ -482,7 +472,7 @@ public final class DownloadClient
         }
     }
 
-    private static void printResult(Config cfg, Result r) 
+    private static void printResult(Config cfg, Result r)
     {
         System.out.printf(Locale.ROOT, "file       : %s (%,d bytes)%n", cfg.filename(), r.fileSize());
         System.out.printf(Locale.ROOT, "setup      : mode=%s workers=%d write=%s%n",
