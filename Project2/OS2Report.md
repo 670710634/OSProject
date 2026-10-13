@@ -58,7 +58,7 @@ javac -d out (Get-ChildItem -Recurse -Filter *.java src).FullName
 ### Run
 ```powershell
 # Terminal 1 (Server)
-java -cp out server.FileServer {1-65535} files {traditional/nio} {pool/virtual}
+java -cp out server.FileServer {1-65534} files {traditional/nio} {pool/virtual}
 
 # Terminal 2 (Client)
 java -cp out client.DownloadClient localhost {Port ที่เลือก} #LIST&INFO
