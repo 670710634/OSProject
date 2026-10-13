@@ -31,11 +31,11 @@ src
     {
         BenchmarkRunner.java
     }
-    files
+}
+files
     {
         TargetFile.txt
     }
-}
 ```
 
 ## เทียบแบบ Merge & Direct 10 รอบ
