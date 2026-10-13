@@ -44,17 +44,6 @@ import java.util.concurrent.Callable;
  *            ไฟล์นี้ใช้ร่วมกับ worker อื่น จึง "ห้ามล้าง/ตัด" ไฟล์ แค่เขียนทับตำแหน่งตัวเอง
  *            ทุก worker เปิด handle ของตัวเอง (position แยกกัน) เขียนคนละช่วงที่ไม่ซ้อนกัน
  *            จึงไม่ต้อง lock
- *
- * ช่วงยาว 0 byte (เกิดเมื่อไฟล์เล็กกว่าจำนวน worker): ไม่ต้องต่อ server เลย
- * แต่แบบ parts ต้องสร้าง part file เปล่าไว้ เพราะขั้น merge จะเปิดอ่านทุก part
- *
- * ข้อควรรู้ (เอาไปอธิบายในรายงานได้)
- *   - FileChannel.transferFrom จาก socket ไม่ใช่ zero-copy จริง ข้างในอ่านจาก channel
- *     ลง buffer ชั่วคราวขนาดเล็ก แล้วเขียนลงไฟล์ ประโยชน์ zero-copy เห็นชัดที่ฝั่ง server (transferTo)
- *   - read timeout (SO_TIMEOUT) ใช้ได้กับการอ่าน header เท่านั้น ส่วน transferFrom ไม่รองรับ timeout
- *     ถ้า server ค้างกลางทางในโหมด NIO worker จะรอจนกว่า connection จะถูกตัด
- *
- * Callable ไม่มี state ที่แก้ไขระหว่างทำงาน (ทุกอย่างเป็น final) ใช้ object หนึ่งตัวต่อหนึ่งช่วง
  */
 public final class DownloadWorker implements Callable<Long>
 {
@@ -136,18 +125,18 @@ public final class DownloadWorker implements Callable<Long>
             socket.setTcpNoDelay(true);
 
             OutputStream out = socket.getOutputStream();
-            InputStream in = socket.getInputStream(); // ไม่ห่อ buffer ตามที่ Protocol.readLine ต้องการ
+            InputStream in = socket.getInputStream(); 
 
-            out.write(requestBytes());
+            out.write(requestBytes()); // ส่ง GET <filename> <offset> <length>
             out.flush();
-            expectOk(Protocol.readLine(in));
+            expectOk(Protocol.readLine(in)); // อ่านทีละ  byte จนเจอ \n
 
             byte[] buffer = new byte[Protocol.BUFFER_SIZE];
-            try (RandomAccessFile raf = new RandomAccessFile(target.toFile(), "rw"))
+            try (RandomAccessFile raf = new RandomAccessFile(target.toFile(), "rw")) // รับข้อมูลจาก server แล้วเขียนลงไฟล์ปลายทาง
             {
-                if (ownsTarget)
+                if (ownsTarget)// กำหนดตำแหน่งเริ่มเขียน
                 {
-                    raf.setLength(0);
+                    raf.setLength(0);// ล้าง part file เก่า
                 }
                 raf.seek(targetOffset);
 
@@ -177,16 +166,13 @@ public final class DownloadWorker implements Callable<Long>
     {
         try (SocketChannel channel = SocketChannel.open())
         {
-            // ใช้ adaptor socket() เพื่อ connect แบบมี timeout และอ่าน header ผ่าน InputStream
-            // (ยังเป็น blocking mode ตามค่าเริ่มต้น และ InputStream ของ adaptor ไม่มี buffer ของตัวเอง
-            //  จึงไม่กิน payload ที่ตามมา)
             Socket socket = channel.socket();
             socket.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
             socket.setSoTimeout(READ_TIMEOUT_MS);
             socket.setTcpNoDelay(true);
 
-            ByteBuffer request = ByteBuffer.wrap(requestBytes());
-            while (request.hasRemaining())
+            ByteBuffer request = ByteBuffer.wrap(requestBytes()); // ส่ง GET <filename> <offset> <length>
+            while (request.hasRemaining()) // buffer > socket channel
             {
                 channel.write(request);
             }
@@ -196,7 +182,6 @@ public final class DownloadWorker implements Callable<Long>
             {
                 long position = targetOffset;
                 long remaining = range.length();
-                // transferFrom ไม่รับประกันว่าจะได้ครบในครั้งเดียว จึงต้องวนจนครบ
                 while (remaining > 0)
                 {
                     long n = file.transferFrom(channel, position, remaining);
@@ -244,7 +229,7 @@ public final class DownloadWorker implements Callable<Long>
         if (ownsTarget)
         {
             return FileChannel.open(target, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
-                    StandardOpenOption.TRUNCATE_EXISTING);
+                    StandardOpenOption.TRUNCATE_EXISTING);// ล้าง part file เก่า
         }
         return FileChannel.open(target, StandardOpenOption.WRITE);
     }
