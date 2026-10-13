@@ -10,10 +10,6 @@ import java.util.HexFormat;
 
 /**
  * HashUtil.java
- * ------------------------------------------------------------
- * คำนวณ SHA-256 ของไฟล์ ใช้ 2 ที่หลัก ๆ
- *   1) ฝั่ง Client: ตรวจว่าไฟล์ที่ดาวน์โหลด+merge เสร็จ "เหมือนต้นฉบับ" ทุก byte
- *   2) ฝั่ง Benchmark: บันทึก hash ลง results.csv เพื่อยืนยันว่าทุกโหมดได้ไฟล์ตรงกัน
  *
  * วิธีใช้ตรวจความถูกต้อง
  *   String expected = HashUtil.sha256Hex(Path.of("files/test.bin"));      // ไฟล์ต้นฉบับบน server
@@ -21,22 +17,20 @@ import java.util.HexFormat;
  *   boolean ok      = HashUtil.matches(expected, actual);
  *
  * อ่านไฟล์ทีละ chunk (BUFFER_SIZE) จึงใช้ memory คงที่ ไม่ว่าไฟล์จะใหญ่แค่ไหน
- * ไม่มี state ภายในคลาส เรียกจากหลาย thread พร้อมกันได้อย่างปลอดภัย
  */
-public final class HashUtil 
+public final class HashUtil
 {
 
     private static final String ALGORITHM = "SHA-256";
 
-    private HashUtil() {} // ไม่ให้สร้าง object ใช้เป็นคลาสเครื่องมืออย่างเดียว
-
+    private HashUtil() {}
     /**
      * คำนวณ SHA-256 ของไฟล์ทั้งไฟล์ คืนเป็นข้อความ hex ตัวพิมพ์เล็ก 64 ตัวอักษร
      * เช่น "e3b0c44298fc1c149afbf4c8996fb924..."
      */
-    public static String sha256Hex(Path file) throws IOException 
+    public static String sha256Hex(Path file) throws IOException
     {
-        try (InputStream in = Files.newInputStream(file)) 
+        try (InputStream in = Files.newInputStream(file))
         {
             return sha256Hex(in);
         }
@@ -44,9 +38,8 @@ public final class HashUtil
 
     /**
      * คำนวณ SHA-256 จาก InputStream ใด ๆ (อ่านจนจบ stream)
-     * ไม่ปิด stream ให้ ผู้เรียกเป็นคนปิดเอง
      */
-    public static String sha256Hex(InputStream in) throws IOException 
+    public static String sha256Hex(InputStream in) throws IOException
     {
         MessageDigest digest = newDigest();
         byte[] buffer = new byte[Protocol.BUFFER_SIZE];
@@ -83,7 +76,6 @@ public final class HashUtil
         } 
         catch (NoSuchAlgorithmException e) 
         {
-            // SHA-256 เป็นอัลกอริทึมที่ทุก JVM ต้องมี ถ้าเข้ามาตรงนี้แปลว่า JVM มีปัญหา
             throw new IllegalStateException(ALGORITHM + " not available", e);
         }
     }

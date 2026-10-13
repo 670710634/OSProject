@@ -12,8 +12,6 @@ package common;
  * ตัวอย่าง: ไฟล์ 1000 byte แบ่ง 10 ช่วง
  *   Range(0, 0, 100), Range(1, 100, 100), ... , Range(9, 900, 100)
  *
- * เป็น record คือคลาสที่เก็บข้อมูลอย่างเดียว แก้ค่าไม่ได้หลังสร้าง
- * ปลอดภัยเมื่อส่งต่อระหว่าง thread (RangePlanner สร้าง -> DownloadWorker ใช้)
  */
 public record Range(int index, long offset, long length) 
 {

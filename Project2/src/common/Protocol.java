@@ -85,7 +85,7 @@ public final class Protocol
     public record FileInfo(String name, long size) {}
 
     // ============================================================
-    // ฝั่ง Client: สร้างข้อความ request
+    // ฝั่ง Client: สร้างข้อความ request ส่งไปให้ server
     // ============================================================
 
     public static String listRequest() 
@@ -107,10 +107,6 @@ public final class Protocol
     // ฝั่ง Server: แปลงบรรทัดคำสั่งเป็น Request
     // ============================================================
 
-    /**
-     * แปลงบรรทัดที่ client ส่งมาเป็น Request
-     * ถ้ารูปแบบผิดจะโยน ProtocolException(400) เพื่อให้ server ตอบ ERROR กลับไป
-     */
     public static Request parseRequest(String line) throws ProtocolException 
     {
         if (line == null || line.isBlank()) 
@@ -169,7 +165,7 @@ public final class Protocol
     }
 
     // ============================================================
-    // ฝั่ง Server: สร้างข้อความ response
+    // ฝั่ง Server: สร้างข้อความ response ส่งกลับไปให้ client
     // ============================================================
 
     public static String fileLine(String name, long size) 
@@ -193,9 +189,9 @@ public final class Protocol
         return RES_OK + " " + length + "\n";
     }
 
-    public static String errorResponse(int code, String message) 
+    public static String errorResponse(int errcode, String message) 
     {
-        return RES_ERROR + " " + code + " " + message + "\n";
+        return RES_ERROR + " " + errcode + " " + message + "\n";
     }
 
     // ============================================================
@@ -208,17 +204,17 @@ public final class Protocol
         if (line.startsWith(RES_ERROR + " ")) 
         {
             String[] p = line.split(" ", 3);
-            int code = ERR_INTERNAL;
+            int errcode = ERR_INTERNAL;
             try
             {
-                code = Integer.parseInt(p[1]);
+                errcode = Integer.parseInt(p[1]);
             } 
             catch (NumberFormatException ignored) 
             {
                 // ถ้ารหัสอ่านไม่ได้ ใช้ 500 ไปก่อน
             }
             String msg = p.length > 2 ? p[2] : "";
-            throw new ProtocolException(code, msg);
+            throw new ProtocolException(errcode, msg);
         }
     }
 
@@ -272,13 +268,6 @@ public final class Protocol
     /**
      * อ่านข้อความจนเจอ '\n' แล้วคืนเป็น String (ไม่รวม '\n' และ '\r')
      * คืน null ถ้าอีกฝ่ายปิด connection ก่อนส่งอะไรมาเลย
-     *
-     * ทำไมไม่ใช้ BufferedReader.readLine()?
-     *   เพราะ BufferedReader จะ "อ่านล่วงหน้า" เกินบรรทัดมาเก็บใน buffer ของมัน
-     *   ถ้าหลัง header "OK <len>" มี payload ดิบตามมา ข้อมูลส่วนหนึ่งจะหลุดเข้าไปอยู่ใน
-     *   buffer นั้น แล้ว client จะอ่าน payload ไม่ครบ/เพี้ยน
-     *   ฟังก์ชันนี้อ่านทีละ byte เท่าที่จำเป็น จึงหยุดตรง '\n' พอดี
-     *   (ใช้กับ InputStream ที่ไม่ได้ห่อ buffer ไว้เท่านั้น)
      */
     public static String readLine(InputStream in) throws IOException 
     {
