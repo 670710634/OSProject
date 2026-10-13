@@ -94,9 +94,9 @@ public final class FileServer
     // main: อ่าน argument แล้วเริ่มเซิร์ฟเวอร์
     // ============================================================
 
-    public static void main(String[] args) 
+    public static void main(String[] args)
     {
-        try 
+        try
         {
             int port = args.length > 0 ? Integer.parseInt(args[0]) : Protocol.DEFAULT_PORT;
             Path dir = Path.of(args.length > 1 ? args[1] : "files");
@@ -105,8 +105,8 @@ public final class FileServer
 
             ExecutorService executor = newExecutor(threads);
             FileStore store = new FileStore(dir);
-
             FileServer server = new FileServer(port, store, mode, executor);
+            
             Runtime.getRuntime().addShutdownHook(new Thread(server::stop, "shutdown-hook"));
 
             System.out.printf("FileServer: port=%d dir=%s mode=%s threads=%s%n",

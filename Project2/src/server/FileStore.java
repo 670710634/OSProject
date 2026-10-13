@@ -62,24 +62,24 @@ public final class FileStore
      * ข้ามไฟล์ที่ชื่อมีช่องว่าง เพราะ protocol แยกคำด้วยช่องว่าง ส่งชื่อแบบนั้นไปแล้ว client parse ไม่ได้
      * ข้ามไฟล์ที่ resolve() จะปฏิเสธด้วย เพื่อให้ "สิ่งที่ LIST บอก" โหลดได้จริงทุกไฟล์
      */
-    public List<FileInfo> list() throws IOException 
+    public List<FileInfo> list() throws IOException
     {
         List<FileInfo> result = new ArrayList<>();
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(root)) 
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(root))
         {
             for (Path p : stream) 
             {
                 String name = p.getFileName().toString();
-                if (hasWhitespace(name)) 
+                if (hasWhitespace(name))
                 {
                     continue;
                 }
-                try 
+                try
                 {
                     Path real = resolve(name);
                     result.add(new FileInfo(name, Files.size(real)));
-                } 
-                catch (ProtocolException e) 
+                }
+                catch (ProtocolException e)
                 {
                     // ไม่ใช่ไฟล์ปกติ หรือ symlink ชี้ออกนอก root ข้ามไป
                 }

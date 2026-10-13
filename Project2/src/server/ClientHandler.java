@@ -45,7 +45,7 @@ import java.util.List;
  *
  * เปิด log ทุกคำสั่งด้วย  java -Dserver.verbose=true ...  (ปิดไว้เป็นค่าเริ่มต้น ไม่ให้กระทบเวลา benchmark)
  *
- * สัญญาที่ FileStore ต้องมี (ไฟล์ถัดไปที่จะเขียน)
+ * สัญญาที่ FileStore ต้องมี
  *   List<Protocol.FileInfo> list() throws IOException
  *   Path resolve(String filename) throws ProtocolException
  *       คืน path จริงของไฟล์ปกติใน root เท่านั้น ถ้าไม่พบ/ชื่อไม่ปลอดภัย (../) โยน ProtocolException
@@ -216,37 +216,61 @@ public final class ClientHandler implements Runnable
             while (remaining > 0) 
             {
                 int want = (int) Math.min(buffer.length, remaining);
-                int n = raf.read(buffer, 0, want);
+                int n = raf.read(buffer, 0, want); //write from kernel(page cache) to heap(buffer)
                 if (n == -1) 
                 {
                     throw new IOException("file shrank while sending: " + file);
                 }
-                out.write(buffer, 0, n);
+                out.write(buffer, 0, n);//write from heap(buffer) to kernel(socket)
                 remaining -= n;
             }
             out.flush();
         }
     }
 
-    /** NIO: FileChannel.transferTo ส่งจากไฟล์เข้า socket ตรง ๆ (zero-copy) */
+    /**
+    * NIO: FileChannel.transferTo ส่งจากไฟล์เข้า socket ตรง ๆ (zero-copy)
+    */
     private void sendRangeNio(Path file, long offset, long length) throws IOException 
     {
+        ByteBuffer fallback = null; // สร้างตอนจำเป็นครั้งแรก แล้วใช้ซ้ำ
         try (FileChannel fc = FileChannel.open(file, StandardOpenOption.READ)) 
         {
             long position = offset;
             long remaining = length;
-            // transferTo ไม่รับประกันว่าจะส่งครบในครั้งเดียว (บางระบบจำกัดต่อครั้ง) จึงต้องวนจนครบ
             while (remaining > 0) 
             {
-                long n = fc.transferTo(position, remaining, channel);
+                long n = fc.transferTo(position, remaining, channel);//write from kernel(page cache) to kernel(socket(channel))
                 if (n <= 0) 
                 {
-                    throw new IOException("transferTo made no progress at position " + position);
+                    if (fallback == null) 
+                    {
+                        fallback = ByteBuffer.allocate(Protocol.BUFFER_SIZE);
+                    }
+                    n = sendChunk(fc, position, remaining, fallback);
                 }
                 position += n;
                 remaining -= n;
             }
         }
+    }
+
+    /** อ่านจากไฟล์ 1 ก้อน (ไม่เกิน remaining) แล้วเขียนเข้า socket จนหมดก้อน คืนจำนวน byte ที่ส่ง */
+    private long sendChunk(FileChannel fc, long position, long remaining, ByteBuffer buf) throws IOException 
+    {
+        buf.clear();
+        buf.limit((int) Math.min(buf.capacity(), remaining));
+        int read = fc.read(buf, position);
+        if (read <= 0) 
+        {
+            throw new IOException("file shrank while sending at position " + position);
+        }
+        buf.flip();
+        while (buf.hasRemaining()) 
+        {
+            channel.write(buf);
+        }
+        return read;
     }
 
     // ============================================================
