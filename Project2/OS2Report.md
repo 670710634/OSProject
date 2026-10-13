@@ -33,9 +33,9 @@ src
     }
 }
 files
-    {
-        TargetFile.txt
-    }
+{
+    TargetFile.txt
+}
 ```
 
 ## เทียบแบบ Merge & Direct 10 รอบ
